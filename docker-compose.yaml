@@ -1,0 +1,75 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.158.0
+    container_name: otel-collector
+    restart: unless-stopped
+    command: ["--config=env:OTEL_COLLECTOR_CONFIG"]
+    environment:
+      OTEL_COLLECTOR_CONFIG: |
+        receivers:
+          otlp:
+            protocols:
+              grpc:
+                endpoint: 0.0.0.0:4317
+              http:
+                endpoint: 0.0.0.0:4318
+
+        processors:
+          memory_limiter:
+            check_interval: 1s
+            limit_mib: 256
+            spike_limit_mib: 64
+          batch:
+            timeout: 5s
+            send_batch_size: 1024
+
+        exporters:
+          otlp/jaeger:
+            endpoint: jaeger:4317
+            tls:
+              insecure: true
+          debug:
+            verbosity: basic
+
+        extensions:
+          health_check:
+            endpoint: 0.0.0.0:13133
+
+        service:
+          extensions: [health_check]
+          telemetry:
+            logs:
+              level: info
+          pipelines:
+            traces:
+              receivers: [otlp]
+              processors: [memory_limiter, batch]
+              exporters: [otlp/jaeger, debug]
+            metrics:
+              receivers: [otlp]
+              processors: [memory_limiter, batch]
+              exporters: [debug]
+            logs:
+              receivers: [otlp]
+              processors: [memory_limiter, batch]
+              exporters: [debug]
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      - jaeger
+    networks:
+      - observability
+
+  jaeger:
+    image: cr.jaegertracing.io/jaegertracing/jaeger:2.20.0
+    container_name: jaeger
+    restart: unless-stopped
+    ports:
+      - "16686:16686"
+    networks:
+      - observability
+
+networks:
+  observability:
+    name: observability

@@ -1,0 +1,38 @@
+services:
+  python-313-fastapi-app:
+    image: your-python-313-fastapi-app:local
+    container_name: python-313-fastapi-app
+    restart: unless-stopped
+    cpus: "0.5"
+    mem_limit: 700m
+    memswap_limit: 700m
+    environment:
+      PYTHONUNBUFFERED: "1"
+      OTEL_SERVICE_NAME: python-313-fastapi-app
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=lower,service.namespace=local
+    ports:
+      # Container listens on 8080; host exposes 8000 (standard uvicorn port).
+      - "8000:8080"
+    command:
+      - sh
+      - -c
+      - >
+        python -m pip install --no-cache-dir
+        opentelemetry-distro
+        opentelemetry-exporter-otlp &&
+        opentelemetry-bootstrap -a install &&
+        opentelemetry-instrument uvicorn app.main:app --host 0.0.0.0 --port 8080
+    # Requires pip, internet access, write permissions, and a FastAPI app at app.main:app.
+    # Change app.main:app if the real application uses a different ASGI entrypoint.
+    networks:
+      - observability
+
+networks:
+  observability:
+    external: true

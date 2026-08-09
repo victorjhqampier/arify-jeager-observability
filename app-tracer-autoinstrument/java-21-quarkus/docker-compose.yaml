@@ -1,0 +1,33 @@
+services:
+  java-21-quarkus-app:
+    image: your-java-21-quarkus-app:local
+    container_name: java-21-quarkus-app
+    restart: unless-stopped
+    cpus: "0.5"
+    mem_limit: 700m
+    memswap_limit: 700m
+    ports:
+      # Container listens on 8080; host exposes 8080 (standard Quarkus port).
+      - "8080:8080"
+    volumes:
+      - /opt/otel-agents/java/opentelemetry-javaagent.jar:/otel/opentelemetry-javaagent.jar:ro
+    environment:
+      QUARKUS_HTTP_HOST: 0.0.0.0
+      QUARKUS_HTTP_PORT: "8080"
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/opentelemetry-javaagent.jar"
+      OTEL_SERVICE_NAME: java-21-quarkus-app
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=lower,service.namespace=local
+    # Requires /opt/otel-agents/java/opentelemetry-javaagent.jar on the host.
+    # Do not change the production Dockerfile for Jaeger; production remains on Datadog.
+    networks:
+      - observability
+
+networks:
+  observability:
+    external: true

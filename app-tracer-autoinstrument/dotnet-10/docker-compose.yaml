@@ -1,0 +1,40 @@
+services:
+  dotnet-10-app:
+    image: your-dotnet-10-app:local
+    container_name: dotnet-10-app
+    restart: unless-stopped
+    cpus: "0.5"
+    mem_limit: 700m
+    memswap_limit: 700m
+    ports:
+      # Container listens on 8080; host exposes 5001 (standard .NET Kestrel port).
+      - "5001:8080"
+    volumes:
+      - /opt/otel-agents/dotnet:/otel/dotnet:ro
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      CORECLR_ENABLE_PROFILING: "1"
+      CORECLR_PROFILER: "{918728DD-259F-4A6A-AC2B-B85E1B658318}"
+      CORECLR_PROFILER_PATH: /otel/dotnet/linux-x64/OpenTelemetry.AutoInstrumentation.Native.so
+      DOTNET_STARTUP_HOOKS: /otel/dotnet/net/OpenTelemetry.AutoInstrumentation.StartupHook.dll
+      DOTNET_ADDITIONAL_DEPS: /otel/dotnet/AdditionalDeps
+      DOTNET_SHARED_STORE: /otel/dotnet/store
+      OTEL_DOTNET_AUTO_HOME: /otel/dotnet
+      OTEL_SERVICE_NAME: dotnet-10-app
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=lower,service.namespace=local
+    # Requires OpenTelemetry .NET Auto-Instrumentation extracted at /opt/otel-agents/dotnet on the host.
+    # Use linux-arm64 in CORECLR_PROFILER_PATH if your application image is ARM64.
+    # Do not change the production Dockerfile for Jaeger; production remains on Datadog.
+    networks:
+      - observability
+
+networks:
+  observability:
+    external: true
