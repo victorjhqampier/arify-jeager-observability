@@ -36,13 +36,16 @@ services:
       - sh
       - -c
       - >
-        /axapp/.venv/bin/python -m pip install --no-cache-dir
+        uv pip install --python /axapp/.venv/bin/python
         opentelemetry-distro
-        opentelemetry-exporter-otlp &&
-        /axapp/.venv/bin/python -m opentelemetry.instrumentation.bootstrap -a install &&
+        opentelemetry-exporter-otlp
+        opentelemetry-instrumentation-fastapi
+        opentelemetry-instrumentation-asgi
+        opentelemetry-instrumentation-requests
+        opentelemetry-instrumentation-urllib3 &&
         /axapp/.venv/bin/python -m opentelemetry.instrumentation.auto_instrumentation
         /axapp/.venv/bin/uvicorn Presentation.app:app --app-dir src --host 0.0.0.0 --port 80 --workers 1 --loop uvloop --http httptools
-    # Requires uv-based venv at /axapp/.venv/, internet access, and a FastAPI app at Presentation.app:app.
+    # Requires uv, uv-based venv at /axapp/.venv/, internet access, and a FastAPI app at Presentation.app:app.
     # Adjust the entrypoint if your application uses a different ASGI module path.
     networks:
       - observability

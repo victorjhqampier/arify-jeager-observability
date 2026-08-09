@@ -6,11 +6,10 @@ Esta plantilla inyecta OpenTelemetry en una aplicacion Python 3.13 FastAPI sin c
 
 Por defecto no se requiere ningun artefacto manual.
 
-La plantilla de Compose instala los paquetes OpenTelemetry al iniciar el contenedor usando el venv de uv:
+La plantilla de Compose instala los paquetes OpenTelemetry al iniciar el contenedor usando `uv`, porque el venv en `/axapp/.venv/` no incluye `pip`:
 
 ```bash
-/axapp/.venv/bin/python -m pip install --no-cache-dir opentelemetry-distro opentelemetry-exporter-otlp
-/axapp/.venv/bin/python -m opentelemetry.instrumentation.bootstrap -a install
+uv pip install --python /axapp/.venv/bin/python opentelemetry-distro opentelemetry-exporter-otlp opentelemetry-instrumentation-fastapi opentelemetry-instrumentation-asgi opentelemetry-instrumentation-requests opentelemetry-instrumentation-urllib3
 /axapp/.venv/bin/python -m opentelemetry.instrumentation.auto_instrumentation /axapp/.venv/bin/uvicorn Presentation.app:app --app-dir src --host 0.0.0.0 --port 80
 ```
 
@@ -19,6 +18,7 @@ La plantilla de Compose instala los paquetes OpenTelemetry al iniciar el contene
 La imagen de la aplicacion debe tener:
 
 - Runtime compatible con Python 3.13.
+- Binario `uv` disponible en el contenedor.
 - Virtual environment de `uv` en `/axapp/.venv/`.
 - Acceso a internet para instalar paquetes.
 - Permisos de escritura en el venv para instalar paquetes.
@@ -26,22 +26,25 @@ La imagen de la aplicacion debe tener:
 
 ## Como Se Inyecta
 
-La plantilla de Compose instala OpenTelemetry en el venv de uv, ejecuta bootstrap discovery y arranca FastAPI mediante el modulo de auto-instrumentacion:
+La plantilla de Compose instala OpenTelemetry en el venv de uv y arranca FastAPI mediante el modulo de auto-instrumentacion:
 
 ```yaml
 command:
   - sh
   - -c
   - >
-    /axapp/.venv/bin/python -m pip install --no-cache-dir
+    uv pip install --python /axapp/.venv/bin/python
     opentelemetry-distro
-    opentelemetry-exporter-otlp &&
-    /axapp/.venv/bin/python -m opentelemetry.instrumentation.bootstrap -a install &&
+    opentelemetry-exporter-otlp
+    opentelemetry-instrumentation-fastapi
+    opentelemetry-instrumentation-asgi
+    opentelemetry-instrumentation-requests
+    opentelemetry-instrumentation-urllib3 &&
     /axapp/.venv/bin/python -m opentelemetry.instrumentation.auto_instrumentation
     /axapp/.venv/bin/uvicorn Presentation.app:app --app-dir src --host 0.0.0.0 --port 80 --workers 1 --loop uvloop --http httptools
 ```
 
-**Nota:** Se usa `python -m opentelemetry.instrumentation.auto_instrumentation` en lugar del wrapper `opentelemetry-instrument` para evitar errores de `sys.executable=None` en entornos con venv de uv.
+**Nota:** Se usa `uv pip install --python /axapp/.venv/bin/python` porque el venv de uv puede no traer `pip`. Tambien se usa `python -m opentelemetry.instrumentation.auto_instrumentation` en lugar del wrapper `opentelemetry-instrument` para evitar errores de `sys.executable=None` en entornos con venv de uv.
 
 La telemetria se envia al Collector con:
 
@@ -75,7 +78,7 @@ podman compose -f app-tracer-autoinstrument/python-313-fastapi/docker-compose.ya
 Verifica que los paquetes existan despues de que el contenedor arranque:
 
 ```bash
-docker compose exec business-api /axapp/.venv/bin/python -m pip list | grep opentelemetry
+docker compose exec business-api uv pip list --python /axapp/.venv/bin/python | grep opentelemetry
 ```
 
 La app esta disponible en `http://localhost:8000` (el contenedor escucha en 80, el host expone 8000).
@@ -92,6 +95,7 @@ Abre `http://localhost:16686` y busca `business-api` o el `OTEL_SERVICE_NAME` co
 
 - Instalar paquetes al inicio es practico para ambientes bajos, pero es mas lento y depende de acceso a internet.
 - Para ambientes controlados, considera agregar las dependencias de OpenTelemetry directamente en el `pyproject.toml` del proyecto.
-- Si tu imagen usa pip estandar en lugar de uv, cambia `/axapp/.venv/bin/python` por `python` y ajusta los paths.
+- Si tu imagen usa pip estandar en lugar de uv, cambia `uv pip install --python /axapp/.venv/bin/python` por `python -m pip install` y ajusta los paths.
 - Cambia `Presentation.app:app` y `--app-dir src` si la app FastAPI real usa otra ruta de modulo.
 - Se usa `python -m opentelemetry.instrumentation.auto_instrumentation` en lugar del script `opentelemetry-instrument` para evitar el error `TypeError: execv: path should be string, bytes or os.PathLike, not NoneType` que ocurre cuando `sys.executable` es `None` en entornos con venv de uv.
+- No uses `/axapp/.venv/bin/python -m pip` en esta imagen si el venv fue creado por uv sin pip; fallara con `No module named pip`.
