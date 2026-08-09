@@ -10,7 +10,7 @@ La plantilla de Compose instala los paquetes OpenTelemetry al iniciar el contene
 
 ```bash
 uv pip install --python /axapp/.venv/bin/python opentelemetry-distro opentelemetry-exporter-otlp opentelemetry-instrumentation-fastapi opentelemetry-instrumentation-asgi opentelemetry-instrumentation-requests opentelemetry-instrumentation-urllib3
-/axapp/.venv/bin/python -m opentelemetry.instrumentation.auto_instrumentation /axapp/.venv/bin/uvicorn Presentation.app:app --app-dir src --host 0.0.0.0 --port 80
+/axapp/.venv/bin/opentelemetry-instrument /axapp/.venv/bin/uvicorn Presentation.app:app --app-dir src --host 0.0.0.0 --port 80
 ```
 
 ## Requisitos
@@ -40,11 +40,11 @@ command:
     opentelemetry-instrumentation-asgi
     opentelemetry-instrumentation-requests
     opentelemetry-instrumentation-urllib3 &&
-    /axapp/.venv/bin/python -m opentelemetry.instrumentation.auto_instrumentation
+    /axapp/.venv/bin/opentelemetry-instrument
     /axapp/.venv/bin/uvicorn Presentation.app:app --app-dir src --host 0.0.0.0 --port 80 --workers 1 --loop uvloop --http httptools
 ```
 
-**Nota:** Se usa `uv pip install --python /axapp/.venv/bin/python` porque el venv de uv puede no traer `pip`. Tambien se usa `python -m opentelemetry.instrumentation.auto_instrumentation` en lugar del wrapper `opentelemetry-instrument` para evitar errores de `sys.executable=None` en entornos con venv de uv.
+**Nota:** Se usa `uv pip install --python /axapp/.venv/bin/python` porque el venv de uv puede no traer `pip`. Tambien se usa `/axapp/.venv/bin/opentelemetry-instrument` y `/axapp/.venv/bin/uvicorn` para evitar depender del `PATH` del contenedor.
 
 La telemetria se envia al Collector con:
 
@@ -97,5 +97,5 @@ Abre `http://localhost:16686` y busca `business-api` o el `OTEL_SERVICE_NAME` co
 - Para ambientes controlados, considera agregar las dependencias de OpenTelemetry directamente en el `pyproject.toml` del proyecto.
 - Si tu imagen usa pip estandar en lugar de uv, cambia `uv pip install --python /axapp/.venv/bin/python` por `python -m pip install` y ajusta los paths.
 - Cambia `Presentation.app:app` y `--app-dir src` si la app FastAPI real usa otra ruta de modulo.
-- Se usa `python -m opentelemetry.instrumentation.auto_instrumentation` en lugar del script `opentelemetry-instrument` para evitar el error `TypeError: execv: path should be string, bytes or os.PathLike, not NoneType` que ocurre cuando `sys.executable` es `None` en entornos con venv de uv.
+- Se usa `/axapp/.venv/bin/opentelemetry-instrument` con el path completo de `/axapp/.venv/bin/uvicorn` para evitar que el wrapper busque `uvicorn` fuera del venv.
 - No uses `/axapp/.venv/bin/python -m pip` en esta imagen si el venv fue creado por uv sin pip; fallara con `No module named pip`.
